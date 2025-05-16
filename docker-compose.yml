@@ -1,0 +1,153 @@
+services:
+  api:
+    container_name: evolution_api
+    image: atendai/evolution-api:v2.2.3
+    restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - web
+      - internal
+    environment:
+      #########################################################
+      # Configurações Gerais da API ###########################
+      #########################################################
+      # Configura o Endereço da Evolution
+      - SERVER_URL=${SERVER_URL}
+      # Habilita a remoção automática da instâncias se não houver conexão
+      - DEL_INSTANCE=false
+      # Configura o Cliente da Evolution API
+      - CONFIG_SESSION_PHONE_CLIENT=Windows
+      - CONFIG_SESSION_PHONE_NAME=Chrome
+      # Configura a Versão do Cliente do WhatsApp da Evolution API
+      - CONFIG_SESSION_PHONE_VERSION=2.3000.1015901307
+      # Informa a quantidade de QRCODE que será gerado
+      - QRCODE_LIMIT=30
+      # Informa o idioma da Evolution
+      - LANGUAGE=pt-BR
+      
+      #########################################################
+      # Configurações de Autenticação da API ##################
+      #########################################################
+      # Configura a Chave de Autenticação da API
+      - AUTHENTICATION_API_KEY=${AUTHENTICATION_API_KEY}
+      # Configura a exibição da Chave de Autenticação na Listagem de Instâncias
+      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+      
+      #########################################################
+      # Configurações do Banco de Dados #######################
+      #########################################################
+      # Habilita a conexão com o Banco de Dados
+      - DATABASE_ENABLED=true
+      # Configura o Provider do Banco de Dados
+      - DATABASE_PROVIDER=postgresql
+      # Configura o Host do Banco de Dados
+      - DATABASE_CONNECTION_URI=${DATABASE_CONNECTION_URI}
+      # Identificador da Evolution quando usa 1 banco de dados para várias instâncias
+      - DATABASE_CONNECTION_CLIENT_NAME=evolution_v2
+      # Habilita se Deseja Salvar os Dados da Instância
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      # Habilita se Deseja Salvar os Dados de Mensagens
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      # Habilita se Deseja Salvar os Dados de Mensagens
+      - DATABASE_SAVE_MESSAGE_UPDATE=true
+      # Habilita se Deseja Salvar os Dados de Contatos
+      - DATABASE_SAVE_DATA_CONTACTS=true
+      # Habilita se Deseja Salvar os Dados de Chats
+      - DATABASE_SAVE_DATA_CHATS=true
+      
+      #########################################################
+      # Configurações de Open AI e Dify AI ####################
+      #########################################################
+      # Habilita a conexão com o Open Ai
+      - OPENAI_ENABLED=true
+      # Configura a Chave de Acesso do Open Ai
+      - OPENAI_API_KEY_GLOBAL=${OPENAI_API_KEY_GLOBAL:-}
+      # Habilita a conexão com o Dify AI
+      - DIFY_ENABLED=true
+      
+      #########################################################
+      # Configurações do Cache da API #########################
+      #########################################################
+      # Configura o Provider de Cache da API
+      - CACHE_REDIS_ENABLED=true
+      # Configura o URI do Redis
+      - CACHE_REDIS_URI=${CACHE_REDIS_URI}
+      # Configura o Prefixo da Chave do Redis
+      - CACHE_REDIS_PREFIX_KEY=evolution_v2
+      # Configura se vai Salvar as Instâncias no Redis
+      - CACHE_REDIS_SAVE_INSTANCES=true
+    expose:
+      - 8080
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.evolution.rule=Host(`evolution.nooknerd.com.br`)"
+      - "traefik.http.routers.evolution.tls=true"
+      - "traefik.http.routers.evolution.tls.certresolver=lets-encrypt"
+      - "traefik.http.services.evolution.loadbalancer.server.port=8080"
+      - "traefik.http.services.evolution.loadbalancer.passHostHeader=true"
+      - "traefik.docker.network=web"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 2048M
+
+  redis:
+    image: redis:6-alpine
+    container_name: redis-evolution
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - evolution_redis:/data
+    networks:
+      internal:
+        aliases:
+          - redis
+    labels:
+      - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres:
+    container_name: postgres-evolution
+    image: postgres:15
+    command: ["postgres", "-c", "max_connections=1000", "-c", "listen_addresses=*"]
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-postgres.sh:/docker-entrypoint-initdb.d/init-postgres.sh
+    networks:
+      internal:
+        aliases:
+          - postgres
+    labels:
+      - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  evolution_instances:
+  evolution_redis:
+  postgres_data:
+
+networks:
+  web:
+    external: true
+  internal:
+    driver: bridge
