@@ -60,7 +60,10 @@ services:
       - DATABASE_SAVE_DATA_CONTACTS=true
       # Habilita se Deseja Salvar os Dados de Chats
       - DATABASE_SAVE_DATA_CHATS=true
-      
+      # Habilita se Deseja Salvar os Dados de Labels
+      - DATABASE_SAVE_DATA_LABELS=true
+      # Habilita se Deseja Salvar o Historico de Dados
+      - DATABASE_SAVE_DATA_HISTORIC=true
       #########################################################
       # Configurações de Open AI e Dify AI ####################
       #########################################################
@@ -82,6 +85,16 @@ services:
       - CACHE_REDIS_PREFIX_KEY=evolution_v2
       # Configura se vai Salvar as Instâncias no Redis
       - CACHE_REDIS_SAVE_INSTANCES=true
+      
+      - CACHE_LOCAL_ENABLED=false
+      
+      #########################################################
+      # Configurações de Webhook #############################
+      #########################################################
+      # Desabilita o uso de webhooks que estão causando erros
+      - WEBHOOK_GLOBAL_ENABLED=false
+      - WEBHOOK_GLOBAL_URL=''
+      - WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS=false
     expose:
       - 8080
     labels:
